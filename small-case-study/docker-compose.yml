@@ -1,0 +1,16 @@
+version: '3.8'
+
+services: 
+  alfa: 
+    build:
+     context: alfa
+     target: builder
+    ports: 
+      - '8000:8000'
+
+  beta: 
+    build:
+     context: beta
+     target: builder
+    ports: 
+      - '8005:8000'

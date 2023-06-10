@@ -1,0 +1,4 @@
+This small case study is designed to test the following capabilities:
+run two u-services in python
+run both in a docker compose file
+test their integratino with kafka 

@@ -1,0 +1,63 @@
+# Copyright (c) 2021# This file includes the SAMBADT components
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Eclipse Public License 2.0 which is available at
+# http://www.eclipse.org/legal/epl-2.0
+
+version: '3.8'
+
+services:
+
+# Samba components
+
+#  knowledge:
+#    image: docker.io/mongo:4.2
+#    user: mongodb
+#    ports:
+#      - 27010:27017
+#    environment:
+#      MONGO_INITDB_ROOT_USERNAME: admin
+#      MONGO_INITDB_ROOT_PASSWORD: admin
+
+#  mtp:
+#    build: ./mtp
+#    ports:
+#      - "4990:5000"
+
+#  tse:
+#    build: ./tse
+#    ports:
+#      - "4995:5000"
+
+#  graphwalker:
+#    image: altwalker/graphwalker:latest
+#    ports:
+#      - "8887:8887"
+#    command: gw online -s RESTFUL
+
+# Kafka components
+
+  zookeeper:
+    image: 'bitnami/zookeeper:latest'
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      ALLOW_PLAINTEXT_LISTENER: 'yes'
+      KAFKA_LISTENERS: PLAINTEXT://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092

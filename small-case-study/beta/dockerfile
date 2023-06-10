@@ -1,0 +1,12 @@
+# syntax=docker/dockerfile:1.4
+FROM --platform=$BUILDPLATFORM python:3.7.9-alpine3.13 AS builder
+
+WORKDIR /beta
+
+COPY requirements.txt /beta
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip3 install -r requirements.txt
+
+COPY . /beta
+
+CMD ["python", "beta.py"]
