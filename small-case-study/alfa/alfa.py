@@ -3,7 +3,7 @@
 
 import os
 import warnings 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, make_response
 from kafka import KafkaProducer
 from faker import Faker
 from json import dumps
@@ -26,7 +26,7 @@ def start_kafka_producer(bootstrap_servers='localhost:9092'):
     
     return None
 
-def consume_kafka_producer(producer, topic, payload):
+def dispatch_to_kafka_producer(producer, topic, payload):
     
     key_parameters = [producer,topic,payload]
     
@@ -46,6 +46,7 @@ def on_send_success(record_metadata):
 
 def on_send_error(excp):
     print("error sending msg",excp)
+
 """
 >>>>>>>>>>>>>>APP Section<<<<<<<<<<<<
 esse app tem 4 endpoints basicos
@@ -63,6 +64,10 @@ def create_app(config=None):
     app.config.update(dict(DEBUG=True))
     app.config.update(config or {})
 
+    #iniciando 
+    producer = start_kafka_producer()
+    fk = Faker()
+
     @app.route("/kafka_status")
     def poducer_available(producer):
         return False if producer is None else True
@@ -74,19 +79,29 @@ def create_app(config=None):
     @app.route("/send_data/<someId>")
     def send_data(someId):
         
-        #iniciando 
-        producer = start_kafka_producer()
         if producer:
-
-            #gerando conteudo aleatório para o payload
-            fk = Faker()
             name = fk.name()
-            consume_kafka_producer(producer=producer,payload=jsonify({"id":someId,"name":name}),topic="beta_input_topic")
+            id = fk.random_int(min=1, max=9999)
+            dispatch_to_kafka_producer(producer=producer,payload=jsonify({"id":id,"name":name}),topic="beta_input_topic")
+            response = make_response('msg sent to topic', 202)
         else:
             print("Not possible to deliver message to defined topic on bootstrap server")
+            response = make_response('bootstrap server out of service', 400)
 
+        return
 
+    @app.route("/teste/kafka")
+    def teste_kafka_cluster():
+        name = fk.name()
+        id = fk.random_int(min=1, max=9999)
+        data_name = {'id':id, 'name' : name} 
+        pdc = producer.send('nomes', value = data_name)
+        return make_response(str(pdc.get()), 202) 
+
+    #<<< end app >>>
+    return app
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
+    #port = int(os.environ.get("PORT", 8000))
     app = create_app()
-    app.run(host="0.0.0.0", port=port)
+    #app.run(host="0.0.0.0", port=port)
+    app.run()
