@@ -58,6 +58,7 @@ esse app tem 4 endpoints basicos
 """
 
 def create_app(config=None):
+
     app = Flask(__name__)
 
     # See http://flask.pocoo.org/docs/latest/config/
@@ -69,28 +70,27 @@ def create_app(config=None):
     fk = Faker()
 
     @app.route("/kafka_status")
-    def poducer_available(producer):
-        return False if producer is None else True
+    def poducer_available():
+        return make_response("Kafka broker offline" if producer is None else "Kafka broker online", 202)
 
     @app.route("/")
     def hello_world():
         return "Hello World, I am the service Alfa"
 
-    @app.route("/send_data/<someId>")
-    def send_data(someId):
-        
+    @app.route("/send_user_to_beta")
+    def send_data():
         if producer:
             name = fk.name()
             id = fk.random_int(min=1, max=9999)
-            dispatch_to_kafka_producer(producer=producer,payload=jsonify({"id":id,"name":name}),topic="beta_input_topic")
+            dispatch_to_kafka_producer(producer=producer,payload={"id":id,"name":name},topic="beta_input_topic")
             response = make_response('msg sent to topic', 202)
         else:
             print("Not possible to deliver message to defined topic on bootstrap server")
             response = make_response('bootstrap server out of service', 400)
 
-        return
+        return response
 
-    @app.route("/teste/kafka")
+    @app.route("/kafka_status/producer_test")
     def teste_kafka_cluster():
         name = fk.name()
         id = fk.random_int(min=1, max=9999)
@@ -100,6 +100,7 @@ def create_app(config=None):
 
     #<<< end app >>>
     return app
+
 if __name__ == "__main__":
     #port = int(os.environ.get("PORT", 8000))
     app = create_app()
