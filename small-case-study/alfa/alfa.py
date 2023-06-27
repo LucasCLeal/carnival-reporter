@@ -3,7 +3,7 @@
 
 import os
 import warnings 
-from flask import Flask, jsonify, make_response
+from flask import Flask, make_response
 from kafka import KafkaProducer
 from faker import Faker
 from json import dumps
