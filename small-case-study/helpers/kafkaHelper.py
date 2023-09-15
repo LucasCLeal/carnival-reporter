@@ -2,7 +2,6 @@ from kafka import KafkaConsumer
 
 class KafkaHelper:
     def __init__(self):
-        self._secret = "This is a secret."
         self.consumer = None
         self.producer = None
 
@@ -25,6 +24,7 @@ class KafkaHelper:
         except Exception as err:
             print(err)
             self.consumer = None
-            raise Exception("Error creating consumer")
+        else:
+            return self.consumer
     def get_consumer_next_message(self):
         return next(self.consumer)
