@@ -33,7 +33,9 @@ def create_app(base_name:str):
     def hello_world():
         return "Hello World"
 
-
+    @app.route("/kafka/toggle_consumer_loop")
+    def hello_world():
+        return "Hello World"
     @app.route("/kafka/start_kafka_consumer")
     def start_kafka_consumer():
 
