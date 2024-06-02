@@ -23,9 +23,14 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 import json
 
 from confluent_kafka import Consumer, KafkaException, KafkaError
-from fastapi import BackgroundTasks, FastAPI
+from fastapi import FastAPI
 from dotenv import load_dotenv
+from threading import Thread
 import os
+import signal
+import sys
+
+shutdown_flag = False
 
 '''
 The goal of this service is to monitor periodicaly the information in tha kafka topics in the cluster
@@ -37,6 +42,7 @@ It must notify the the service responsible for the test case generation
 app = FastAPI()
 load_dotenv()  # This method will load environment variables from .env file
 topic_sub_list = []
+
 
 # Setup kafka consumer loop
 def get_kafka_consumer():
@@ -63,11 +69,23 @@ def fetch_and_subscribe_to_topics(consumer: Consumer, subscriptions: list | None
     return sub_list if subscriptions else cluster_topics
 
 
-def consume_messages(consumer: Consumer, topic_sub: list):
+def consume_messages():
     """ Continuously consumes messages from all subscribed topics. """
     try:
-        while True:
-            msg = consumer.poll(timeout=1.0)  # Adjust the timeout as needed
+        # create kafka consumer
+        consumer = get_kafka_consumer()
+    except Exception as err:
+        raise err
+
+    try:
+        while not shutdown_flag:
+            # update list of topics on cluster
+            cluster_metadata = consumer.list_topics(timeout=5.0)  # timeout in seconds
+            cluster_topics = list(cluster_metadata.topics.keys())
+            # subscribe consumer to topics
+            consumer.subscribe(cluster_topics)
+
+            msg = consumer.poll(timeout=5.0)  # Adjust the timeout as needed
             if msg is None:
                 continue
             if msg.error():
@@ -77,53 +95,65 @@ def consume_messages(consumer: Consumer, topic_sub: list):
                 elif msg.error():
                     raise KafkaException(msg.error())
             else:
+                # todo process the message
                 print(f'Received message: {msg.value().decode("utf-8")} from topic {msg.topic()}')
 
-            # update consumer topics
-            fetch_and_subscribe_to_topics(consumer,topic_sub)
-
-    except KeyboardInterrupt:
+    except Exception as exc:
+        print(exc)
         print("Stopping consumer...")
     finally:
         consumer.close()
+        print("Consumer closed")
+
 
 
 def start_monitor_loop():
-    consumer = get_kafka_consumer()
     try:
-        subscriptions = fetch_and_subscribe_to_topics(consumer,None)
-        consume_messages(consumer,subscriptions)
+        consume_messages()
+    except Exception as exc:
+        print("Error in start_monitor_loop:", exc)
     finally:
-        consumer.close()
+        print("Monitor loop terminated")
 
+
+def signal_handler(signal, frame):
+    global shutdown_flag
+    print('Signal received, shutting down...')
+    shutdown_flag = True
+
+
+# set up signal handlers
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 @app.on_event("startup")
 async def startup_event():
-    BackgroundTasks.add_task(start_monitor_loop())
-    print('cluster_monitor started')
+    thread = Thread(target=start_monitor_loop)
+    thread.start()
+    print('Cluster monitor started')
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    global shutdown_flag
+    shutdown_flag = True
+    print('Application is shutting down...')
 
 
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
 
+
 @app.get("/getTopicsSubscription")
 def read_root():
     consumer = get_kafka_consumer()
     cluster_metadata = consumer.list_topics(timeout=10)  # timeout in seconds
-    return json.dumps({'topics':list(cluster_metadata.topics.keys())})
+    consumer.close()
+    topic_list = list(cluster_metadata.topics.keys())
+    return json.dumps({"topics": topic_list})
+
 
 @app.get("/StartReporter")
 def read_root():
     return {"Hello": "World"}
-
-
-'''EventGraphModel management'''
-
-# todo
-# async function to read the kafka topics available
-# todo
-# function tha recieves the content of kafka topics and generate a model from it
-# todo
-# model - holds information about the behaviour of an application with the goal to generate test cases
-# the class must
