@@ -26,11 +26,9 @@ from confluent_kafka import Consumer, KafkaException, KafkaError
 from fastapi import FastAPI
 from dotenv import load_dotenv
 from threading import Thread
+from EventGraphModel.eventGraphModel import EventGraphModelManager
 import os
 import signal
-import sys
-
-shutdown_flag = False
 
 '''
 The goal of this service is to monitor periodicaly the information in tha kafka topics in the cluster
@@ -39,10 +37,19 @@ It must store the models in a topic to keep a track of if evolution.
 It must notify the the service responsible for the test case generation
 '''
 
+# start globa objects
 app = FastAPI()
-load_dotenv()  # This method will load environment variables from .env file
-topic_sub_list = []
+shutdown_flag = False
+modelManager = EventGraphModelManager()
 
+# load .env ()
+load_dotenv()  # This method will load environment variables from .env file
+
+'''
+[Cluster monitor functionality]
+This section stores the code responsible to manage the topics on the target kafka cluster
+listing the topics, defining which topics to be ignored, manage the runtime EventGraphModel
+'''
 
 # Setup kafka consumer loop
 def get_kafka_consumer():
@@ -50,23 +57,11 @@ def get_kafka_consumer():
     # See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
     conf = {
         'bootstrap.servers': os.getenv('BOOTSTRAP_SERVER'),  # Change this to your Kafka server configuration
-        'group.id': 'full_cluster_monitor',
+        #'group.id': 'full_cluster_monitor',
+        'group.id': 'new_group',
         'auto.offset.reset': 'earliest'
     }
     return Consumer(conf)
-
-
-def fetch_and_subscribe_to_topics(consumer: Consumer, subscriptions: list | None) -> list:
-    """ Fetches the current list of topics from the Kafka cluster. """
-    cluster_metadata = consumer.list_topics(timeout=10)  # timeout in seconds
-    cluster_topics = list(cluster_metadata.topics.keys())
-    sub_list = []
-    if subscriptions:
-        sub_list = [topic for topic in cluster_topics if topic not in subscriptions]
-        consumer.subscribe(sub_list)
-    else:
-        consumer.subscribe(cluster_topics)
-    return sub_list if subscriptions else cluster_topics
 
 
 def consume_messages():
@@ -77,26 +72,40 @@ def consume_messages():
     except Exception as err:
         raise err
 
+    silenced_topics = os.getenv('OFF_TOPICS').split()
+
     try:
         while not shutdown_flag:
             # update list of topics on cluster
             cluster_metadata = consumer.list_topics(timeout=5.0)  # timeout in seconds
             cluster_topics = list(cluster_metadata.topics.keys())
             # subscribe consumer to topics
-            consumer.subscribe(cluster_topics)
+            cluster_topics = [t for t in cluster_topics if t not in silenced_topics]
+
+            if len(cluster_topics)>0:
+                consumer.subscribe(cluster_topics)
+            else:
+                continue
 
             msg = consumer.poll(timeout=5.0)  # Adjust the timeout as needed
             if msg is None:
                 continue
-            if msg.error():
+            elif msg.error():
                 if msg.error().code() == KafkaError._PARTITION_EOF:
-                    # End of partition event
                     print(f'{msg.topic()} [{msg.partition()}] reached end at offset {msg.offset()}')
                 elif msg.error():
-                    raise KafkaException(msg.error())
+                    print(f'{msg.error()}')
+                    continue
             else:
-                # todo process the message
-                print(f'Received message: {msg.value().decode("utf-8")} from topic {msg.topic()}')
+                if msg.topic() in ['ConsumerLog']:
+                    # todo send to modelManager - assign consumer to topic
+                    print(f'Received message: {msg.value().decode("utf-8")} from topic {msg.topic()}')
+                    modelManager.update_from_ConsumerLog_topic(msg.value().decode('utf-8'))
+                else:
+                    # todo send to modelManager - assign consumer to topic
+                    print(f'Received message: {msg.value().decode("utf-8")} from topic {msg.topic()}')
+                    modelManager.update_from_regular_topic(msg.value().decode('utf-8'))
+
 
     except Exception as exc:
         print(exc)
@@ -104,7 +113,6 @@ def consume_messages():
     finally:
         consumer.close()
         print("Consumer closed")
-
 
 
 def start_monitor_loop():
@@ -115,10 +123,15 @@ def start_monitor_loop():
     finally:
         print("Monitor loop terminated")
 
+'''
+[gracious shutdown]
+This section is responsible to signal the end/start of the application and trigger changes in variables that will
+affect the execution of Threads not demonic
+'''
 
 def signal_handler(signal, frame):
     global shutdown_flag
-    print('Signal received, shutting down...')
+    #print('Signal received, shutting down...')
     shutdown_flag = True
 
 
@@ -130,7 +143,7 @@ signal.signal(signal.SIGTERM, signal_handler)
 async def startup_event():
     thread = Thread(target=start_monitor_loop)
     thread.start()
-    print('Cluster monitor started')
+    print('Reporter started')
 
 
 @app.on_event("shutdown")
@@ -139,6 +152,9 @@ async def shutdown_event():
     shutdown_flag = True
     print('Application is shutting down...')
 
+'''
+[WS endpoints]
+'''
 
 @app.get("/")
 def read_root():
@@ -148,12 +164,12 @@ def read_root():
 @app.get("/getTopicsSubscription")
 def read_root():
     consumer = get_kafka_consumer()
-    cluster_metadata = consumer.list_topics(timeout=10)  # timeout in seconds
+    cluster_metadata = consumer.list_topics(timeout=1)  # timeout in seconds
     consumer.close()
     topic_list = list(cluster_metadata.topics.keys())
     return json.dumps({"topics": topic_list})
 
 
-@app.get("/StartReporter")
+@app.get("/GenerateModel")
 def read_root():
     return {"Hello": "World"}

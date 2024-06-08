@@ -64,7 +64,7 @@ class Vertex:
     def to_json(self):
         return json.dumps(self.to_dict(), indent=4)
 
-class Model:
+class GWModel:
 
     '''
         simpler version of graphwalker model,
@@ -74,6 +74,10 @@ class Model:
     '''
 
     def __init__(self, generator: str, name: str):
+
+        if not generator or not name:
+            raise ValueError("Both generator and name must be non-empty.")
+
         self.generator = generator
         self.id = str(uuid.uuid4())  # Generate a unique ID
         self.name = name
