@@ -26,9 +26,11 @@ from confluent_kafka import Consumer, KafkaException, KafkaError
 from fastapi import FastAPI
 from dotenv import load_dotenv
 from threading import Thread
+from datetime import datetime
 from EventGraphModel.eventGraphModel import EventGraphModelManager
 import os
 import signal
+
 
 '''
 The goal of this service is to monitor periodicaly the information in tha kafka topics in the cluster
@@ -42,7 +44,6 @@ app = FastAPI()
 shutdown_flag = False
 modelManager = EventGraphModelManager()
 
-# load .env ()
 load_dotenv()  # This method will load environment variables from .env file
 
 '''
@@ -65,31 +66,46 @@ def get_kafka_consumer():
 
 
 def consume_messages():
-    """ Continuously consumes messages from all subscribed topics. """
+    """
+    Continuously consumes messages from two control topics.
+    1st premise - All WS in the cluster will infor these two topics about the topics it is consuming and producing
+    """
     try:
         # create kafka consumer
         consumer = get_kafka_consumer()
     except Exception as err:
         raise err
 
-    silenced_topics = os.getenv('OFF_TOPICS').split()
-
     try:
-        while not shutdown_flag:
-            # update list of topics on cluster
-            cluster_metadata = consumer.list_topics(timeout=5.0)  # timeout in seconds
-            cluster_topics = list(cluster_metadata.topics.keys())
-            # subscribe consumer to topics
-            cluster_topics = [t for t in cluster_topics if t not in silenced_topics]
 
-            if len(cluster_topics)>0:
-                consumer.subscribe(cluster_topics)
-            else:
-                continue
+        topic_list = consumer.list_topics(timeout=5.0)  # timeout in seconds
+        ctrl_topics = ['ConsumerLog', 'ProducerLog']
+        if ctrl_topics not in list(topic_list.topics.keys()):
+            raise Exception('[fail] ctrl_topics not available in kafka cluster')
+        else:
+            consumer.subscribe(ctrl_topics)
+
+        while not shutdown_flag:
 
             msg = consumer.poll(timeout=5.0)  # Adjust the timeout as needed
             if msg is None:
-                continue
+
+                #caso não existam mais mensagens em ambos os topicos, deve-se gerar uma foto grafia do sistema
+                #só é possivel gerar o modelo caso exitam dados sobre os topicos do cluster
+                #usar os dados levantadado até agora para gerar um GWModel
+                if modelManager.cluster_topic_data != {}:
+                    modelManager.name = 'teste_model'
+                    modelManager.generator = 'teste_generator'
+                    #gera novo modelo. caso novo modelo diferente do anterior ou anterior nulo.
+                    #salvar nova versão do modelo no historico do model manager, incluindo o timestamp da mudança
+                    current_model = modelManager.create_gw_model()
+                    if modelManager.model_history == []:
+                        modelManager.model_history.append({"timestamp": datetime.now().isoformat(),"model":current_model})
+                    else:
+                        report = modelManager.compare_models(current_model,modelManager.model_history[-1]["model"])
+                        if report["has_differences"]:
+                            modelManager.model_history.append({"timestamp": datetime.now().isoformat(), "model": current_model})
+
             elif msg.error():
                 if msg.error().code() == KafkaError._PARTITION_EOF:
                     print(f'{msg.topic()} [{msg.partition()}] reached end at offset {msg.offset()}')
@@ -100,12 +116,11 @@ def consume_messages():
                 if msg.topic() in ['ConsumerLog']:
                     # todo send to modelManager - assign consumer to topic
                     print(f'Received message: {msg.value().decode("utf-8")} from topic {msg.topic()}')
-                    modelManager.update_from_ConsumerLog_topic(msg.value().decode('utf-8'))
-                else:
+                    modelManager.update_from_consumer_log_topic(msg.value().decode('utf-8'))
+                elif msg.topic() in ['ProducerLog']:
                     # todo send to modelManager - assign consumer to topic
                     print(f'Received message: {msg.value().decode("utf-8")} from topic {msg.topic()}')
-                    modelManager.update_from_regular_topic(msg.value().decode('utf-8'))
-
+                    modelManager.update_from_producer_log_topic(msg.value().decode('utf-8'))
 
     except Exception as exc:
         print(exc)
