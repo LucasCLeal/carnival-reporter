@@ -1,4 +1,5 @@
 from confluent_kafka import Producer
+import json
 
 class KafkaLogger:
     def __init__(self, bootstrap_servers='localhost:9092'):
@@ -18,11 +19,12 @@ class KafkaLogger:
         if not topic or not producer or not action:
             raise ValueError("All parameters (topic, producer, action) must be provided")
         message = {"topic":topic,"producer":producer,"action":action}
-        self._send_message('ProducerLog', str(message))
+
+        self._send_message(topic = 'ProducerLog', message  =json.dumps(message))
 
     def log_consumer(self, topic, consumer, action):
 
         if not topic or not consumer or not action:
             raise ValueError("All parameters (topic, producer, action) must be provided")
         message = {"topic":topic,"consumer":consumer,"action":action}
-        self._send_message('ConsumerLog', str(message))
+        self._send_message(topic = 'ConsumerLog', message = json.dumps(message))

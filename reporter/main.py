@@ -20,8 +20,6 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 OR OTHER DEALINGS IN THE SOFTWARE.
 
 '''
-import json
-
 from confluent_kafka import Consumer, KafkaException, KafkaError
 from fastapi import FastAPI
 from dotenv import load_dotenv
@@ -29,7 +27,9 @@ from threading import Thread
 from datetime import datetime
 from EventGraphModel.eventGraphModel import EventGraphModelManager
 import os
+import uuid
 import signal
+import json
 
 
 '''
@@ -56,10 +56,13 @@ listing the topics, defining which topics to be ignored, manage the runtime Even
 def get_kafka_consumer():
     # Consumer configuration
     # See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+
+    group_id = f"my_consumer_group_{uuid.uuid4()}"
+
     conf = {
         'bootstrap.servers': os.getenv('BOOTSTRAP_SERVER'),  # Change this to your Kafka server configuration
         #'group.id': 'full_cluster_monitor',
-        'group.id': 'new_group',
+        'group.id': group_id,
         'auto.offset.reset': 'earliest'
     }
     return Consumer(conf)
@@ -79,11 +82,11 @@ def consume_messages():
     try:
 
         topic_list = consumer.list_topics(timeout=5.0)  # timeout in seconds
-        ctrl_topics = ['ConsumerLog', 'ProducerLog']
-        if ctrl_topics not in list(topic_list.topics.keys()):
+        ctrl_topics = {'ConsumerLog', 'ProducerLog'}
+        if not ctrl_topics < set(topic_list.topics.keys()):
             raise Exception('[fail] ctrl_topics not available in kafka cluster')
         else:
-            consumer.subscribe(ctrl_topics)
+            consumer.subscribe(list(ctrl_topics))
 
         while not shutdown_flag:
 
@@ -93,7 +96,7 @@ def consume_messages():
                 #caso não existam mais mensagens em ambos os topicos, deve-se gerar uma foto grafia do sistema
                 #só é possivel gerar o modelo caso exitam dados sobre os topicos do cluster
                 #usar os dados levantadado até agora para gerar um GWModel
-                if modelManager.cluster_topic_data != {}:
+                if modelManager.topics_data != {}:
                     modelManager.name = 'teste_model'
                     modelManager.generator = 'teste_generator'
                     #gera novo modelo. caso novo modelo diferente do anterior ou anterior nulo.

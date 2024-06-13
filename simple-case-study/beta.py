@@ -15,14 +15,14 @@ def home():
 
 def on_startup():
     try:
-        logger.log_producer(topic="sort",producer=app_name,action="add")
-        logger.log_consumer(topic="random_list_number",consumer=app_name,action="add")
+        logger.log_producer(topic="sorted_list",producer=app_name,action="add")
+        logger.log_consumer(topic="rnd_list",consumer=app_name,action="add")
     except Exception as err:
         print(err)
 def on_shutdown():
     try:
-        logger.log_producer(topic="sort", producer=app_name, action="remove")
-        logger.log_consumer(topic="random_list_number", consumer=app_name, action="remove")
+        logger.log_producer(topic="sorted_list", producer=app_name, action="remove")
+        logger.log_consumer(topic="rnd_list", consumer=app_name, action="remove")
     except Exception as err:
         print(err)
 

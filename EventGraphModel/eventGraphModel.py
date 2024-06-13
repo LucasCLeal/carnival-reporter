@@ -73,9 +73,11 @@ class EventGraphModelManager:
                     for tp in tp_cons_dic:
                         for cons in tp_cons_dic[tp]:
                             model.create_edge(tp,ws,cons)
-            return model
+                return model
+            else:
+                raise ValueError("create_gw_model() - No information about topics found")
         else:
-            raise ValueError("Both 'generator' and 'name' must be provided and non-empty.")
+            raise ValueError("create_gw_model() - Both 'generator' and 'name' must be provided and non-empty.")
 
     def update_topic_meta_data(self):
 
@@ -157,14 +159,14 @@ class EventGraphModelManager:
 
     def _set_of_all_consumers_and_producers(self):
 
-        full_set = {}
-        if self.topics_data:
+        full_set = set()
+
+        if self.topics_data == {}:
             return None
+
         for topic in self.topics_data:
-            cons = self.topics_data[topic]["consumers"]
-            prod = self.topics_data[topic]["producers"]
-            full_set.update(cons)
-            full_set.update(prod)
+            full_set.update(self.topics_data[topic]["consumers"])
+            full_set.update(self.topics_data[topic]["producers"])
         return full_set
 
     def _dic_of_consumers_by_topic(self,producer):
