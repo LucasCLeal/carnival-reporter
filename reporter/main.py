@@ -113,15 +113,13 @@ def consume_messages():
                 if msg.error().code() == KafkaError._PARTITION_EOF:
                     print(f'{msg.topic()} [{msg.partition()}] reached end at offset {msg.offset()}')
                 elif msg.error():
-                    print(f'{msg.error()}')
+                    print(f'KafkaError number:{msg.error()}')
                     continue
             else:
                 if msg.topic() in ['ConsumerLog']:
-                    # todo send to modelManager - assign consumer to topic
                     print(f'Received message: {msg.value().decode("utf-8")} from topic {msg.topic()}')
                     modelManager.update_from_consumer_log_topic(msg.value().decode('utf-8'))
                 elif msg.topic() in ['ProducerLog']:
-                    # todo send to modelManager - assign consumer to topic
                     print(f'Received message: {msg.value().decode("utf-8")} from topic {msg.topic()}')
                     modelManager.update_from_producer_log_topic(msg.value().decode('utf-8'))
 
@@ -180,7 +178,7 @@ def read_root():
 
 
 @app.get("/getTopicsSubscription")
-def read_root():
+def get_topics_subscription():
     consumer = get_kafka_consumer()
     cluster_metadata = consumer.list_topics(timeout=1)  # timeout in seconds
     consumer.close()
@@ -189,5 +187,5 @@ def read_root():
 
 
 @app.get("/GenerateModel")
-def read_root():
+def generate_model():
     return {"Hello": "World"}

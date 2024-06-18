@@ -70,9 +70,10 @@ class EventGraphModelManager:
                 for ws in ws_set:
                     #create edges between ws using topics as ref
                     tp_cons_dic = self._dic_of_consumers_by_topic(ws)
-                    for tp in tp_cons_dic:
-                        for cons in tp_cons_dic[tp]:
-                            model.create_edge(tp,ws,cons)
+                    if tp_cons_dic:
+                        for tp in tp_cons_dic:
+                            for cons in tp_cons_dic[tp]:
+                                model.create_edge(tp,ws,cons)
                 return model
             else:
                 raise ValueError("create_gw_model() - No information about topics found")

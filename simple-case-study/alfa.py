@@ -20,7 +20,8 @@ def on_startup():
         print(err)
 def on_shutdown():
     try:
-        logger.log_producer(topic="rnd_list",producer=app_name,action="remove")
+        #logger.log_producer(topic="rnd_list",producer=app_name,action="remove")
+        print("shutdown process commited for", app_name)
     except Exception as err:
         print(err)
 

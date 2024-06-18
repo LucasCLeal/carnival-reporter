@@ -21,8 +21,10 @@ def on_startup():
         print(err)
 def on_shutdown():
     try:
-        logger.log_consumer(topic="unique_list", consumer=app_name, action="remove")
-        logger.log_consumer(topic="sorted_list", consumer=app_name, action="remove")
+        print("shutdown process commited for", app_name)
+
+        #logger.log_consumer(topic="unique_list", consumer=app_name, action="remove")
+        #logger.log_consumer(topic="sorted_list", consumer=app_name, action="remove")
     except Exception as err:
         print(err)
 

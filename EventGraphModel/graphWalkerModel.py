@@ -89,11 +89,17 @@ class GWModel:
         new_vertex = Vertex(id=v_id, name=name)
         self.vertices.append(new_vertex)
 
-    def create_edge(self, name: str, source_vertex: Vertex, target_vertex: Optional[Vertex]):
+    def get_vertex_id_by_name(self, name: str) -> Optional[str]:
+        for vertex in self.vertices:
+            if vertex.name == name:
+                return vertex.id
+        return None
+
+    def create_edge(self, name: str, source_vertex: str, target_vertex: Optional[str]):
         e_id = f"e{len(self.edges)}"
-        source_v_id = source_vertex.id
-        target_v_id = "v0" if target_vertex is None else target_vertex.id
-        new_edge = Edge(id=e_id, name=name, source_vertex_id=source_v_id, target_vertex_id=target_v_id)
+        source_vertex_id = self.get_vertex_id_by_name(source_vertex)
+        target_vertex_id = "v0" if target_vertex is None else self.get_vertex_id_by_name(target_vertex)
+        new_edge = Edge(id=e_id, name=name, source_vertex_id=source_vertex_id, target_vertex_id=target_vertex_id)
         self.edges.append(new_edge)
 
     def to_dict(self):
