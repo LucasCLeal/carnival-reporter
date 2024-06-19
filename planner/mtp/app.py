@@ -1,9 +1,7 @@
 from confluent_kafka import Consumer, KafkaException, KafkaError
 from fastapi import FastAPI
 from dotenv import load_dotenv
-from threading import Thread
 from graphwalkerhelper import GraphWalkerHelper
-from EventGraphModel.eventGraphModel import EventGraphModelManager
 import os
 import uuid
 import signal
@@ -162,7 +160,7 @@ async def shutdown_event():
 
 @app.get("/")
 def read_root():
-    return {"Hello": "Model-based Test Planner"}
+    return {"Hello": "Model-based Test Planner","BOOTSTRAP_SERVER": os.getenv('BOOTSTRAP_SERVER')}
 
 
 @app.get("/test")
