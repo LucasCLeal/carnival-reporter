@@ -7,6 +7,7 @@ import uuid
 import signal
 import json
 import time
+import socket
 
 '''
 The goal of this service is to monitor the system_report topic.
@@ -24,7 +25,10 @@ load_dotenv()  # This method will load environment variables from .env file
 This section stores the code responsible to manage the topics on the target kafka cluster
 listing the topics, defining which topics to be ignored, manage the runtime EventGraphModel
 '''
-
+def get_local_ip():
+    hostname = socket.gethostname()
+    local_ip = socket.gethostbyname(hostname)
+    return local_ip
 
 # Setup kafka consumer loop
 def get_consumer_sub_to_topic_set(topics: set, retry_interval=60, connected: bool = False):
@@ -64,7 +68,7 @@ def consume_messages():
     consumer = None
     try:
         consumer = get_consumer_sub_to_topic_set(topics={'ReporterLog'})
-        gw_helper = GraphWalkerHelper(ip="localhost", port=8887)
+        gw_helper = GraphWalkerHelper(ip=os.getenv('BOOTSTRAP_SERVER'), port=8887)
 
         while not shutdown_flag:
 
@@ -160,16 +164,14 @@ async def shutdown_event():
 
 @app.get("/")
 def read_root():
-    return {"Hello": "Model-based Test Planner","BOOTSTRAP_SERVER": os.getenv('BOOTSTRAP_SERVER')}
+    return {"Hello": "Model-based Test Planner","BOOTSTRAP_SERVER": os.getenv('BOOTSTRAP_SERVER'),"LOCAL IP": get_local_ip()}
 
 
 @app.get("/test")
 def test():
 
-    #todo deploy graphwalker e MTP on docker
-
     model_file = open("./test_models/example.json", "r")
-    gw_helper = GraphWalkerHelper(ip="localhost", port=8887)
+    gw_helper = GraphWalkerHelper(ip=os.getenv('BOOTSTRAP_SERVER'), port=8887)
     result = []
     if gw_helper.isGWOnline():
         gw_helper.model = json.loads(model_file.read())
@@ -177,5 +179,5 @@ def test():
         while gw_helper.hasNext():
             result.append(gw_helper.getNext())
 
-    return result
+    return {"result":result}
 
